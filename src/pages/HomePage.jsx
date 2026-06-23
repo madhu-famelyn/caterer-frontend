@@ -4,26 +4,6 @@ import CatererCard from '../components/CatererCard'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 
-const MOCK_CATERERS = [
-  {
-    id: 1, business_name: 'Royal Taj Catering', city: 'Mumbai', state: 'Maharashtra',
-    cuisine_type: 'North Indian', rating: 4.9, review_count: 482, price_per_guest: 1200,
-    image_url: 'https://images.unsplash.com/photo-1555244162-803834f70033?w=600&q=80',
-    tags: ['Corporate', 'Weddings'], verified: true,
-  },
-  {
-    id: 2, business_name: 'Masala Bistro', city: 'Kolkata', state: 'West Bengal',
-    cuisine_type: 'Bengali & Fusion', rating: 4.8, review_count: 311, price_per_guest: 450,
-    image_url: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=600&q=80',
-    tags: ['Casual', 'Buffet'], verified: true,
-  },
-  {
-    id: 3, business_name: 'Saffron Table', city: 'Bangalore', state: 'Karnataka',
-    cuisine_type: 'South Indian & Coastal', rating: 4.9, review_count: 624, price_per_guest: 750,
-    image_url: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=600&q=80',
-    tags: ['Fine Dining', 'Traditional'], verified: true,
-  },
-]
 
 const TESTIMONIALS = [
   {
@@ -41,19 +21,19 @@ const TESTIMONIALS = [
 ]
 
 export default function HomePage() {
-  const [caterers, setCaterers] = useState(MOCK_CATERERS)
+  const [caterers, setCaterers] = useState([])
+  const [loadingCaterers, setLoadingCaterers] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     const apiUrl = API_BASE_URL.replace(/\/$/, '')
-    fetch(`${apiUrl}/api/v1/caterers/?limit=6`)
-      .then((r) => r.ok ? r.json() : null)
+    fetch(`${apiUrl}/api/v1/caterers/?limit=3`)
+      .then((r) => r.ok ? r.json() : [])
       .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setCaterers(data.slice(0, 3))
-        }
+        if (Array.isArray(data)) setCaterers(data)
       })
       .catch(() => {})
+      .finally(() => setLoadingCaterers(false))
   }, [])
 
   return (
@@ -164,17 +144,30 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="caterers-grid">
-          {caterers.map((c) => (
-            <CatererCard key={c.id} caterer={c} />
-          ))}
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: '16px' }}>
-          <Link to="/explore" className="see-all-link">
-            See all caterers →
-          </Link>
-        </div>
+        {loadingCaterers ? (
+          <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-secondary)' }}>
+            <p style={{ fontSize: '2rem', marginBottom: '12px' }}>🍽️</p>
+            <p>Loading caterers...</p>
+          </div>
+        ) : caterers.length > 0 ? (
+          <>
+            <div className="caterers-grid">
+              {caterers.map((c) => (
+                <CatererCard key={c.id} caterer={c} />
+              ))}
+            </div>
+            <div style={{ textAlign: 'center', marginTop: '16px' }}>
+              <Link to="/explore" className="see-all-link">
+                See all caterers →
+              </Link>
+            </div>
+          </>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-secondary)' }}>
+            <p style={{ fontSize: '2rem', marginBottom: '12px' }}>🍽️</p>
+            <p>No caterers listed yet. <Link to="/register" style={{ color: 'var(--primary)', fontWeight: 600 }}>Be the first to register!</Link></p>
+          </div>
+        )}
       </section>
 
       {/* ===== TESTIMONIALS ===== */}

@@ -115,12 +115,47 @@ export default function DashboardPage() {
 
   // ── Handlers ──────────────────────────────────────────────────────────────────
 
+  // Handle local file upload to backend
+  const handleFileUpload = async (file, onUploadSuccess) => {
+    if (!file) return
+    const formData = new FormData()
+    formData.append('file', file)
+    setLoading(true)
+    try {
+      const res = await fetch(`${apiUrl}/api/v1/upload`, {
+        method: 'POST',
+        body: formData
+      })
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.detail || 'File upload failed')
+      }
+      const data = await res.json()
+      const absoluteUrl = `${apiUrl}${data.file_url}`
+      onUploadSuccess(absoluteUrl)
+      showMsg('File uploaded successfully!')
+    } catch (err) {
+      showMsg(err.message, 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleProfileSubmit = async (e) => {
     e.preventDefault()
     setLoading(true)
     try {
+      let imageUrl = profileForm.image_url
+      if (imageUrl) {
+        const urlRegex = /https?:\/\/[^\s'",\]]+[^\s'",\]\.]/g;
+        const urls = imageUrl.match(urlRegex) || [];
+        if (urls.length > 0) {
+          imageUrl = urls[0]
+        }
+      }
       const payload = {
         ...profileForm,
+        image_url: imageUrl,
         price_per_guest: profileForm.price_per_guest ? Number(profileForm.price_per_guest) : null,
         service_tags: profileForm.service_tags.split(',').map(t => t.trim()).filter(Boolean)
       }
@@ -149,20 +184,38 @@ export default function DashboardPage() {
     e.preventDefault()
     if (!newGalleryForm.file_url) return
     setLoading(true)
+    const urlRegex = /https?:\/\/[^\s'",\]]+[^\s'",\]\.]/g;
+    const urls = newGalleryForm.file_url.match(urlRegex) || [];
+    if (urls.length === 0) {
+      showMsg('No valid image URLs found in input.', 'error')
+      setLoading(false)
+      return
+    }
     try {
-      const res = await fetch(`${apiUrl}/api/v1/gallery/upload`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(newGalleryForm)
-      })
-      if (!res.ok) throw new Error('Upload failed')
-      const data = await res.json()
-      setGallery([...gallery, data])
+      let successCount = 0
+      const uploadedItems = []
+      for (const url of urls) {
+        const res = await fetch(`${apiUrl}/api/v1/gallery/upload`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ ...newGalleryForm, file_url: url })
+        })
+        if (res.ok) {
+          const data = await res.json()
+          uploadedItems.push(data)
+          successCount++
+        }
+      }
+      if (successCount > 0) {
+        setGallery([...gallery, ...uploadedItems])
+        showMsg(`Successfully uploaded ${successCount} item(s) to gallery!`)
+      } else {
+        throw new Error('Upload failed')
+      }
       setNewGalleryForm({ file_url: '', type: 'photo' })
-      showMsg('Gallery item added!')
     } catch (err) {
       showMsg(err.message, 'error')
     } finally {
@@ -194,8 +247,17 @@ export default function DashboardPage() {
     if (!newAwardForm.title) return
     setLoading(true)
     try {
+      let imageUrl = newAwardForm.image_url
+      if (imageUrl) {
+        const urlRegex = /https?:\/\/[^\s'",\]]+[^\s'",\]\.]/g;
+        const urls = imageUrl.match(urlRegex) || [];
+        if (urls.length > 0) {
+          imageUrl = urls[0]
+        }
+      }
       const payload = {
         ...newAwardForm,
+        image_url: imageUrl,
         year: newAwardForm.year ? Number(newAwardForm.year) : null
       }
       const res = await fetch(`${apiUrl}/api/v1/awards/`, {
@@ -432,8 +494,20 @@ export default function DashboardPage() {
                   <input type="text" value={profileForm.mobile} onChange={e => setProfileForm({ ...profileForm, mobile: e.target.value })} />
                 </div>
                 <div className="form-group">
-                  <label>Cover Image URL</label>
-                  <input type="text" placeholder="https://images.unsplash.com/..." value={profileForm.image_url} onChange={e => setProfileForm({ ...profileForm, image_url: e.target.value })} />
+                  <label>Cover Image URL or File Upload</label>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <input type="text" placeholder="https://images.unsplash.com/..." value={profileForm.image_url} onChange={e => setProfileForm({ ...profileForm, image_url: e.target.value })} style={{ flexGrow: 1 }} />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={e => handleFileUpload(e.target.files[0], (url) => setProfileForm({ ...profileForm, image_url: url }))}
+                      style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                      id="frontend-profile-image-file"
+                    />
+                    <label htmlFor="frontend-profile-image-file" className="btn btn-secondary" style={{ cursor: 'pointer', whiteSpace: 'nowrap', margin: 0, padding: '10px 14px' }}>
+                      📁 Upload File
+                    </label>
+                  </div>
                 </div>
               </div>
 
@@ -530,14 +604,27 @@ export default function DashboardPage() {
               <form onSubmit={handleAddGallery} style={{ background: 'var(--bg-light)', border: '1px solid var(--border)', padding: '20px', borderRadius: 'var(--radius-md)' }}>
                 <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px' }}>Add Photo URL</h3>
                 <div className="form-group">
-                  <label>Image Link</label>
-                  <input
-                    type="text"
-                    placeholder="https://images.unsplash.com/photo-..."
-                    value={newGalleryForm.file_url}
-                    onChange={e => setNewGalleryForm({ ...newGalleryForm, file_url: e.target.value })}
-                    required
-                  />
+                  <label>Image Link or File Upload</label>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      placeholder="https://images.unsplash.com/photo-..."
+                      value={newGalleryForm.file_url}
+                      onChange={e => setNewGalleryForm({ ...newGalleryForm, file_url: e.target.value })}
+                      required
+                      style={{ flexGrow: 1 }}
+                    />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={e => handleFileUpload(e.target.files[0], (url) => setNewGalleryForm({ ...newGalleryForm, file_url: url }))}
+                      style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                      id="frontend-gallery-image-file"
+                    />
+                    <label htmlFor="frontend-gallery-image-file" className="btn btn-secondary" style={{ cursor: 'pointer', whiteSpace: 'nowrap', margin: 0, padding: '10px 14px' }}>
+                      📁 Upload File
+                    </label>
+                  </div>
                 </div>
                 <button type="submit" className="btn-primary" style={{ padding: '10px 20px' }} disabled={loading}>
                   Add Photo
@@ -589,8 +676,20 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="form-group">
-                  <label>Accompanying Image URL (optional)</label>
-                  <input type="text" placeholder="https://..." value={newAwardForm.image_url} onChange={e => setNewAwardForm({ ...newAwardForm, image_url: e.target.value })} />
+                  <label>Accompanying Image URL or File Upload (optional)</label>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <input type="text" placeholder="https://..." value={newAwardForm.image_url} onChange={e => setNewAwardForm({ ...newAwardForm, image_url: e.target.value })} style={{ flexGrow: 1 }} />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={e => handleFileUpload(e.target.files[0], (url) => setNewAwardForm({ ...newAwardForm, image_url: url }))}
+                      style={{ opacity: 0, width: 0, height: 0, position: 'absolute' }}
+                      id="frontend-award-image-file"
+                    />
+                    <label htmlFor="frontend-award-image-file" className="btn btn-secondary" style={{ cursor: 'pointer', whiteSpace: 'nowrap', margin: 0, padding: '10px 14px' }}>
+                      📁 Upload File
+                    </label>
+                  </div>
                 </div>
                 <div className="form-group">
                   <label>Description</label>

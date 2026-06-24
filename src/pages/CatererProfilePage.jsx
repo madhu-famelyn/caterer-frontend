@@ -147,12 +147,23 @@ export default function CatererProfilePage() {
     }
   }
 
+  const cleanImageUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('photo_folder:')) {
+      const matches = url.match(/['"](https?:\/\/[^'"]+)['"]/);
+      if (matches && matches[1]) {
+        return matches[1];
+      }
+    }
+    return url;
+  };
+
   return (
     <div>
       {/* Cover image */}
       <div className="profile-hero">
         <img
-          src={caterer.image_url || 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&q=80'}
+          src={cleanImageUrl(caterer.image_url) || 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&q=80'}
           alt={caterer.business_name}
           onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&q=80' }}
         />

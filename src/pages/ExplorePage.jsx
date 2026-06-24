@@ -36,7 +36,8 @@ export default function ExplorePage() {
       c.city?.toLowerCase().includes(search.toLowerCase()) ||
       c.cuisine_type?.toLowerCase().includes(search.toLowerCase())
     const matchCity = city === 'All cities' || c.city === city
-    const matchCategory = category === 'All categories' || c.cuisine_type === category
+    const matchCategory = category === 'All categories' || 
+      c.cuisine_type?.split(',').map(x => x.trim().toLowerCase()).includes(category.toLowerCase())
     return matchSearch && matchCity && matchCategory
   }).sort((a, b) => {
     if (sort === 'Top rated') return (b.rating || 0) - (a.rating || 0)

@@ -15,6 +15,7 @@ export default function LoginPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
+    console.log('LoginPage: Attempting login for email:', form.email)
     try {
       const apiUrl = API_BASE_URL.replace(/\/$/, '')
       const res = await fetch(`${apiUrl}/api/v1/auth/login`, {
@@ -27,12 +28,15 @@ export default function LoginPage() {
         throw new Error(data.detail || 'Invalid email or password')
       }
       const data = await res.json()
+      console.log('LoginPage: Login successful! Token and Caterer data received:', data)
       localStorage.setItem('token', data.access_token)
       localStorage.setItem('caterer', JSON.stringify(data.caterer))
       
       // On success – redirect to dashboard
+      console.log('LoginPage: Redirecting to /dashboard...')
       window.location.href = '/dashboard'
     } catch (err) {
+      console.error('LoginPage: Login error:', err)
       setError(err.message)
     } finally {
       setLoading(false)

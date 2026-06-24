@@ -2,6 +2,31 @@ import { useState, useEffect } from 'react'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 
+function convertGoogleDriveUrl(url) {
+  if (!url) return url
+  
+  // Pattern 1: drive.google.com/file/d/FILE_ID/view
+  const fileDMatch = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/)
+  if (fileDMatch && fileDMatch[1]) {
+    return `https://drive.google.com/uc?export=download&id=${fileDMatch[1]}`
+  }
+  
+  // Pattern 2: drive.google.com/open?id=FILE_ID
+  const openIdMatch = url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/)
+  if (openIdMatch && openIdMatch[1]) {
+    return `https://drive.google.com/uc?export=download&id=${openIdMatch[1]}`
+  }
+
+  // Pattern 3: docs.google.com/file/d/FILE_ID/edit
+  const docsMatch = url.match(/docs\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/)
+  if (docsMatch && docsMatch[1]) {
+    return `https://drive.google.com/uc?export=download&id=${docsMatch[1]}`
+  }
+  
+  return url
+}
+
+
 export default function DashboardPage() {
   const token = localStorage.getItem('token')
   const localCaterer = JSON.parse(localStorage.getItem('caterer') || '{}')
@@ -15,6 +40,7 @@ export default function DashboardPage() {
 
   const [activeTab, setActiveTab] = useState('profile')
   const [loading, setLoading] = useState(false)
+  const [loadingText, setLoadingText] = useState('')
   const [message, setMessage] = useState({ text: '', type: '' }) // type: 'success' | 'error'
 
   // Dashboard Data State
@@ -57,6 +83,7 @@ export default function DashboardPage() {
   // Fetch all vendor data
   const fetchData = async () => {
     setLoading(true)
+    console.log('DashboardPage: Fetching all vendor data for caterer ID:', catererId)
     try {
       const headers = { 'Authorization': `Bearer ${token}` }
       
@@ -64,6 +91,7 @@ export default function DashboardPage() {
       const profileRes = await fetch(`${apiUrl}/api/v1/caterers/${catererId}`)
       if (profileRes.ok) {
         const data = await profileRes.json()
+        console.log('DashboardPage: Profile loaded successfully:', data)
         setProfile(data)
         setProfileForm({
           business_name: data.business_name || '',
@@ -79,30 +107,62 @@ export default function DashboardPage() {
           service_tags: (data.tags || []).join(', '),
           image_url: data.image_url || ''
         })
+      } else {
+        console.error('DashboardPage: Failed to load profile. Response status:', profileRes.status)
       }
 
       // Gallery
       const galleryRes = await fetch(`${apiUrl}/api/v1/gallery/?caterer_id=${catererId}`)
-      if (galleryRes.ok) setGallery(await galleryRes.json())
+      if (galleryRes.ok) {
+        const data = await galleryRes.json()
+        console.log('DashboardPage: Gallery loaded successfully:', data)
+        setGallery(data)
+      } else {
+        console.error('DashboardPage: Failed to load gallery. Response status:', galleryRes.status)
+      }
 
       // Awards
       const awardsRes = await fetch(`${apiUrl}/api/v1/awards/?caterer_id=${catererId}`, { headers })
-      if (awardsRes.ok) setAwards(await awardsRes.json())
+      if (awardsRes.ok) {
+        const data = await awardsRes.json()
+        console.log('DashboardPage: Awards loaded successfully:', data)
+        setAwards(data)
+      } else {
+        console.error('DashboardPage: Failed to load awards. Response status:', awardsRes.status)
+      }
 
       // Certifications
       const certsRes = await fetch(`${apiUrl}/api/v1/certifications/?caterer_id=${catererId}`, { headers })
-      if (certsRes.ok) setCertifications(await certsRes.json())
+      if (certsRes.ok) {
+        const data = await certsRes.json()
+        console.log('DashboardPage: Certifications loaded successfully:', data)
+        setCertifications(data)
+      } else {
+        console.error('DashboardPage: Failed to load certifications. Response status:', certsRes.status)
+      }
 
       // Licenses
       const licRes = await fetch(`${apiUrl}/api/v1/licenses/?caterer_id=${catererId}`, { headers })
-      if (licRes.ok) setLicenses(await licRes.json())
+      if (licRes.ok) {
+        const data = await licRes.json()
+        console.log('DashboardPage: Licenses loaded successfully:', data)
+        setLicenses(data)
+      } else {
+        console.error('DashboardPage: Failed to load licenses. Response status:', licRes.status)
+      }
 
       // Reviews
       const revRes = await fetch(`${apiUrl}/api/v1/reviews/?caterer_id=${catererId}`)
-      if (revRes.ok) setReviews(await revRes.json())
+      if (revRes.ok) {
+        const data = await revRes.json()
+        console.log('DashboardPage: Reviews loaded successfully:', data)
+        setReviews(data)
+      } else {
+        console.error('DashboardPage: Failed to load reviews. Response status:', revRes.status)
+      }
 
     } catch (err) {
-      console.error(err)
+      console.error('DashboardPage: Error fetching dashboard data:', err)
       showMsg('Failed to load dashboard data.', 'error')
     } finally {
       setLoading(false)
@@ -117,9 +177,14 @@ export default function DashboardPage() {
 
   // Handle local file upload to backend
   const handleFileUpload = async (file, onUploadSuccess) => {
-    if (!file) return
+    if (!file) {
+      console.warn('handleFileUpload: No file selected');
+      return;
+    }
+    console.log('handleFileUpload: Starting upload for', file.name, 'size:', file.size);
     const formData = new FormData()
     formData.append('file', file)
+    setLoadingText('Uploading image...')
     setLoading(true)
     try {
       const res = await fetch(`${apiUrl}/api/v1/upload`, {
@@ -132,18 +197,23 @@ export default function DashboardPage() {
       }
       const data = await res.json()
       const absoluteUrl = `${apiUrl}${data.file_url}`
+      console.log('handleFileUpload: Upload success! URL:', absoluteUrl);
       onUploadSuccess(absoluteUrl)
       showMsg('File uploaded successfully!')
     } catch (err) {
+      console.error('handleFileUpload: Upload error:', err);
       showMsg(err.message, 'error')
     } finally {
       setLoading(false)
+      setLoadingText('')
     }
   }
 
   const handleProfileSubmit = async (e) => {
     e.preventDefault()
+    setLoadingText('Saving changes...')
     setLoading(true)
+    console.log('handleProfileSubmit: Submitting form data:', profileForm);
     try {
       let imageUrl = profileForm.image_url
       if (imageUrl) {
@@ -152,13 +222,15 @@ export default function DashboardPage() {
         if (urls.length > 0) {
           imageUrl = urls[0]
         }
+        imageUrl = convertGoogleDriveUrl(imageUrl)
       }
       const payload = {
         ...profileForm,
         image_url: imageUrl,
-        price_per_guest: profileForm.price_per_guest ? Number(profileForm.price_per_guest) : null,
+        price_per_guest: null,
         service_tags: profileForm.service_tags.split(',').map(t => t.trim()).filter(Boolean)
       }
+      console.log('handleProfileSubmit: Sending payload to API:', payload);
       const res = await fetch(`${apiUrl}/api/v1/caterers/${catererId}`, {
         method: 'PUT',
         headers: {
@@ -167,15 +239,21 @@ export default function DashboardPage() {
         },
         body: JSON.stringify(payload)
       })
-      if (!res.ok) throw new Error('Failed to update profile')
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody.detail || 'Failed to update profile');
+      }
       const data = await res.json()
+      console.log('handleProfileSubmit: Update success! Server returned:', data);
       setProfile(data)
       localStorage.setItem('caterer', JSON.stringify(data))
       showMsg('Profile details updated successfully!')
     } catch (err) {
+      console.error('handleProfileSubmit: Update error:', err);
       showMsg(err.message, 'error')
     } finally {
       setLoading(false)
+      setLoadingText('')
     }
   }
 
@@ -183,6 +261,7 @@ export default function DashboardPage() {
   const handleAddGallery = async (e) => {
     e.preventDefault()
     if (!newGalleryForm.file_url) return
+    setLoadingText('Adding photo to gallery...')
     setLoading(true)
     const urlRegex = /https?:\/\/[^\s'",\]]+[^\s'",\]\.]/g;
     const urls = newGalleryForm.file_url.match(urlRegex) || [];
@@ -220,11 +299,13 @@ export default function DashboardPage() {
       showMsg(err.message, 'error')
     } finally {
       setLoading(false)
+      setLoadingText('')
     }
   }
 
   const handleDeleteGallery = async (id) => {
     if (!confirm('Delete this gallery item?')) return
+    setLoadingText('Deleting gallery item...')
     setLoading(true)
     try {
       const res = await fetch(`${apiUrl}/api/v1/gallery/${id}`, {
@@ -238,6 +319,7 @@ export default function DashboardPage() {
       showMsg(err.message, 'error')
     } finally {
       setLoading(false)
+      setLoadingText('')
     }
   }
 
@@ -245,6 +327,7 @@ export default function DashboardPage() {
   const handleAddAward = async (e) => {
     e.preventDefault()
     if (!newAwardForm.title) return
+    setLoadingText('Adding award details...')
     setLoading(true)
     try {
       let imageUrl = newAwardForm.image_url
@@ -277,11 +360,13 @@ export default function DashboardPage() {
       showMsg(err.message, 'error')
     } finally {
       setLoading(false)
+      setLoadingText('')
     }
   }
 
   const handleDeleteAward = async (id) => {
     if (!confirm('Delete this award?')) return
+    setLoadingText('Deleting award...')
     setLoading(true)
     try {
       const res = await fetch(`${apiUrl}/api/v1/awards/${id}`, {
@@ -295,6 +380,7 @@ export default function DashboardPage() {
       showMsg(err.message, 'error')
     } finally {
       setLoading(false)
+      setLoadingText('')
     }
   }
 
@@ -302,6 +388,7 @@ export default function DashboardPage() {
   const handleAddCert = async (e) => {
     e.preventDefault()
     if (!newCertForm.title) return
+    setLoadingText('Adding certification...')
     setLoading(true)
     try {
       const payload = {
@@ -325,11 +412,13 @@ export default function DashboardPage() {
       showMsg(err.message, 'error')
     } finally {
       setLoading(false)
+      setLoadingText('')
     }
   }
 
   const handleDeleteCert = async (id) => {
     if (!confirm('Delete this certification?')) return
+    setLoadingText('Deleting certification...')
     setLoading(true)
     try {
       const res = await fetch(`${apiUrl}/api/v1/certifications/${id}`, {
@@ -343,6 +432,7 @@ export default function DashboardPage() {
       showMsg(err.message, 'error')
     } finally {
       setLoading(false)
+      setLoadingText('')
     }
   }
 
@@ -350,6 +440,7 @@ export default function DashboardPage() {
   const handleAddLicense = async (e) => {
     e.preventDefault()
     if (!newLicenseForm.title) return
+    setLoadingText('Adding license...')
     setLoading(true)
     try {
       const payload = {
@@ -373,11 +464,13 @@ export default function DashboardPage() {
       showMsg(err.message, 'error')
     } finally {
       setLoading(false)
+      setLoadingText('')
     }
   }
 
   const handleDeleteLicense = async (id) => {
     if (!confirm('Delete this license?')) return
+    setLoadingText('Deleting license...')
     setLoading(true)
     try {
       const res = await fetch(`${apiUrl}/api/v1/licenses/${id}`, {
@@ -391,6 +484,7 @@ export default function DashboardPage() {
       showMsg(err.message, 'error')
     } finally {
       setLoading(false)
+      setLoadingText('')
     }
   }
 
@@ -505,9 +599,24 @@ export default function DashboardPage() {
                       id="frontend-profile-image-file"
                     />
                     <label htmlFor="frontend-profile-image-file" className="btn btn-secondary" style={{ cursor: 'pointer', whiteSpace: 'nowrap', margin: 0, padding: '10px 14px' }}>
-                      📁 Upload File
+                      📁 Upload Image
                     </label>
                   </div>
+                  {profileForm.image_url && (
+                    <div style={{ marginTop: '12px' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Image Preview:</span>
+                      <div style={{ width: '100%', maxHeight: '180px', borderRadius: 'var(--radius-md, 8px)', overflow: 'hidden', border: '1px solid var(--border)', background: '#f1f5f9' }}>
+                        <img 
+                          src={profileForm.image_url} 
+                          alt="Cover Preview" 
+                          style={{ width: '100%', height: '100%', maxHeight: '180px', objectFit: 'cover', display: 'block' }} 
+                          onError={(e) => {
+                            e.target.src = 'https://images.unsplash.com/photo-1555244162-803834f70033?w=600&q=80'; // Fallback if link is broken/private
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -531,15 +640,9 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Cuisine Type</label>
-                  <input type="text" placeholder="e.g. North Indian" value={profileForm.cuisine_type} onChange={e => setProfileForm({ ...profileForm, cuisine_type: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label>Price per guest (₹)</label>
-                  <input type="number" value={profileForm.price_per_guest} onChange={e => setProfileForm({ ...profileForm, price_per_guest: e.target.value })} />
-                </div>
+              <div className="form-group">
+                <label>Cuisine Type</label>
+                <input type="text" placeholder="e.g. North Indian" value={profileForm.cuisine_type} onChange={e => setProfileForm({ ...profileForm, cuisine_type: e.target.value })} />
               </div>
 
               <div className="form-group">
@@ -553,7 +656,7 @@ export default function DashboardPage() {
               </div>
 
               <button type="submit" className="btn-submit" style={{ marginTop: '16px' }} disabled={loading}>
-                Save Changes
+                {loading ? 'Saving Changes...' : 'Save Changes'}
               </button>
             </form>
           )}
@@ -622,12 +725,12 @@ export default function DashboardPage() {
                       id="frontend-gallery-image-file"
                     />
                     <label htmlFor="frontend-gallery-image-file" className="btn btn-secondary" style={{ cursor: 'pointer', whiteSpace: 'nowrap', margin: 0, padding: '10px 14px' }}>
-                      📁 Upload File
+                      📁 Upload Image
                     </label>
                   </div>
                 </div>
                 <button type="submit" className="btn-primary" style={{ padding: '10px 20px' }} disabled={loading}>
-                  Add Photo
+                  {loading ? 'Adding Photo...' : 'Add Photo'}
                 </button>
               </form>
             </div>
@@ -687,7 +790,7 @@ export default function DashboardPage() {
                       id="frontend-award-image-file"
                     />
                     <label htmlFor="frontend-award-image-file" className="btn btn-secondary" style={{ cursor: 'pointer', whiteSpace: 'nowrap', margin: 0, padding: '10px 14px' }}>
-                      📁 Upload File
+                      📁 Upload Image
                     </label>
                   </div>
                 </div>
@@ -696,7 +799,7 @@ export default function DashboardPage() {
                   <textarea rows={2} placeholder="Briefly describe what this award recognizes..." value={newAwardForm.description} onChange={e => setNewAwardForm({ ...newAwardForm, description: e.target.value })} />
                 </div>
                 <button type="submit" className="btn-primary" style={{ padding: '10px 20px' }} disabled={loading}>
-                  Add Award
+                  {loading ? 'Adding Award...' : 'Add Award'}
                 </button>
               </form>
             </div>
@@ -758,7 +861,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <button type="submit" className="btn-primary" style={{ padding: '10px 20px' }} disabled={loading}>
-                  Add Certification
+                  {loading ? 'Adding Certification...' : 'Add Certification'}
                 </button>
               </form>
             </div>
@@ -818,7 +921,7 @@ export default function DashboardPage() {
                   <textarea rows={2} placeholder="Registration number and other details..." value={newLicenseForm.description} onChange={e => setNewLicenseForm({ ...newLicenseForm, description: e.target.value })} />
                 </div>
                 <button type="submit" className="btn-primary" style={{ padding: '10px 20px' }} disabled={loading}>
-                  Add License
+                  {loading ? 'Adding License...' : 'Add License'}
                 </button>
               </form>
             </div>
@@ -860,6 +963,15 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
+
+      {loading && (
+        <div className="premium-loading-overlay">
+          <div className="premium-loading-card">
+            <div className="premium-spinner"></div>
+            <p>{loadingText || 'Processing...'}</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

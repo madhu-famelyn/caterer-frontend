@@ -1,9 +1,31 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 
-const CUISINE_TYPES = ['North Indian', 'South Indian', 'Bengali & Fusion', 'Coastal', 'Mughlai', 'Street Food', 'Gujarati', 'Rajasthani', 'Chinese', 'Italian']
+const CUISINE_TYPES = [
+  'North Indian',
+  'South Indian',
+  'Punjabi',
+  'Maharashtrian',
+  'Gujarati',
+  'Rajasthani',
+  'Bengali & Fusion',
+  'Mughlai',
+  'Coastal',
+  'Street Food',
+  'Chinese',
+  'Italian',
+  'Continental',
+  'Thai',
+  'Mexican',
+  'Lebanese',
+  'Japanese',
+  'Desserts',
+  'Beverages',
+  'Others'
+]
+
 
 export default function RegisterPage() {
   const [form, setForm] = useState({
@@ -16,15 +38,29 @@ export default function RegisterPage() {
     city: '',
     state: '',
     zip: '',
-    cuisine_type: '',
     bio: '',
-    price_per_guest: '',
   })
   const [selectedTags, setSelectedTags] = useState([])
+  const [selectedCuisines, setSelectedCuisines] = useState([])
+  const [customCuisine, setCustomCuisine] = useState('')
+  const [customService, setCustomService] = useState('')
+  const [isOpen, setIsOpen] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+
+  const dropdownRef = useRef(null)
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
 
@@ -34,12 +70,47 @@ export default function RegisterPage() {
     )
   }
 
+  const toggleCuisine = (cuisine) => {
+    setSelectedCuisines((prev) =>
+      prev.includes(cuisine) ? prev.filter((c) => c !== cuisine) : [...prev, cuisine]
+    )
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
+
+    if (selectedCuisines.length === 0) {
+      setError('Please select at least one cuisine type.')
+      setLoading(false)
+      return
+    }
+
+    if (selectedCuisines.includes('Others') && !customCuisine.trim()) {
+      setError('Please specify the custom cuisine type(s) under "Others".')
+      setLoading(false)
+      return
+    }
+
+    if (selectedTags.includes('Others') && !customService.trim()) {
+      setError('Please specify the custom service type(s) under "Others".')
+      setLoading(false)
+      return
+    }
+
     try {
       const apiUrl = API_BASE_URL.replace(/\/$/, '')
+      const cuisinesToSubmit = [...selectedCuisines.filter(c => c !== 'Others')]
+      if (selectedCuisines.includes('Others') && customCuisine.trim()) {
+        cuisinesToSubmit.push(customCuisine.trim())
+      }
+
+      const tagsToSubmit = [...selectedTags.filter(t => t !== 'Others')]
+      if (selectedTags.includes('Others') && customService.trim()) {
+        tagsToSubmit.push(customService.trim())
+      }
+
       const payload = {
         business_name: form.business_name,
         owner_name: form.owner_name,
@@ -50,10 +121,10 @@ export default function RegisterPage() {
         city: form.city,
         state: form.state,
         zip: form.zip,
-        cuisine_type: form.cuisine_type,
+        cuisine_type: cuisinesToSubmit.join(', '),
         bio: form.bio,
-        price_per_guest: form.price_per_guest ? Number(form.price_per_guest) : null,
-        service_tags: selectedTags,
+        price_per_guest: null,
+        service_tags: tagsToSubmit,
       }
       const res = await fetch(`${apiUrl}/api/v1/caterers/`, {
         method: 'POST',
@@ -251,40 +322,56 @@ export default function RegisterPage() {
           {/* Catering Details */}
           <div className="form-section-label" style={{ marginTop: '8px' }}>Catering Details</div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="reg-cuisine">Cuisine type</label>
-              <select
-                id="reg-cuisine"
-                name="cuisine_type"
-                value={form.cuisine_type}
-                onChange={handleChange}
-                required
-              >
-                <option value="">Select cuisine</option>
-                {CUISINE_TYPES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+          <div className="form-group" ref={dropdownRef} style={{ position: 'relative' }}>
+            <label>Cuisine types (Select all that apply)</label>
+            <div 
+              className={`multiselect-trigger ${isOpen ? 'active' : ''}`}
+              onClick={() => setIsOpen(!isOpen)}
+            >
+              <div className="multiselect-values">
+                {selectedCuisines.length === 0 
+                  ? 'Select cuisines' 
+                  : selectedCuisines.join(', ')}
+              </div>
+              <span className="multiselect-arrow">▼</span>
             </div>
-            <div className="form-group">
-              <label htmlFor="reg-price">Price per guest (₹)</label>
-              <input
-                id="reg-price"
-                name="price_per_guest"
-                type="number"
-                placeholder="e.g. 850"
-                value={form.price_per_guest}
-                onChange={handleChange}
-                min={1}
-              />
-            </div>
+
+            {isOpen && (
+              <div className="multiselect-dropdown">
+                <div className="multiselect-options">
+                  {CUISINE_TYPES.map((c) => (
+                    <label key={c} className="multiselect-option" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedCuisines.includes(c)}
+                        onChange={() => toggleCuisine(c)}
+                      />
+                      <span>{c}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          <div className="form-group">
+          {selectedCuisines.includes('Others') && (
+            <div className="form-group" style={{ marginTop: '12px' }}>
+              <label htmlFor="reg-custom-cuisine">Specify other cuisine(s)</label>
+              <input
+                id="reg-custom-cuisine"
+                type="text"
+                placeholder="e.g. Kashmiri, Persian, Lebanese"
+                value={customCuisine}
+                onChange={(e) => setCustomCuisine(e.target.value)}
+                required
+              />
+            </div>
+          )}
+
+          <div className="form-group" style={{ marginTop: '16px' }}>
             <label>Service types</label>
             <div className="tags-grid">
-              {['Weddings', 'Corporate', 'Galas', 'Casual', 'Outdoor', 'Fine Dining', 'Buffet', 'Cultural', 'Organic', 'Creative'].map((tag) => (
+              {['Weddings', 'Corporate', 'Galas', 'Casual', 'Outdoor', 'Fine Dining', 'Buffet', 'Cultural', 'Organic', 'Creative', 'Others'].map((tag) => (
                 <button
                   key={tag}
                   type="button"
@@ -296,6 +383,21 @@ export default function RegisterPage() {
               ))}
             </div>
           </div>
+
+          {selectedTags.includes('Others') && (
+            <div className="form-group" style={{ marginTop: '12px' }}>
+              <label htmlFor="reg-custom-service">Specify other service type(s)</label>
+              <input
+                id="reg-custom-service"
+                type="text"
+                placeholder="e.g. Birthdays, Baby Showers, Anniversaries"
+                value={customService}
+                onChange={(e) => setCustomService(e.target.value)}
+                required
+              />
+            </div>
+          )}
+
 
           <div className="form-group">
             <label htmlFor="reg-bio">About your business</label>

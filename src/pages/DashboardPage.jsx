@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { cleanImageUrl } from '../utils/imageUtils'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 
@@ -607,10 +608,11 @@ export default function DashboardPage() {
                       <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Image Preview:</span>
                       <div style={{ width: '100%', maxHeight: '180px', borderRadius: 'var(--radius-md, 8px)', overflow: 'hidden', border: '1px solid var(--border)', background: '#f1f5f9' }}>
                         <img 
-                          src={profileForm.image_url} 
+                          src={cleanImageUrl(profileForm.image_url) || 'https://images.unsplash.com/photo-1555244162-803834f70033?w=600&q=80'} 
                           alt="Cover Preview" 
                           style={{ width: '100%', height: '100%', maxHeight: '180px', objectFit: 'cover', display: 'block' }} 
                           onError={(e) => {
+                            e.target.onerror = null;
                             e.target.src = 'https://images.unsplash.com/photo-1555244162-803834f70033?w=600&q=80'; // Fallback if link is broken/private
                           }}
                         />
@@ -671,7 +673,7 @@ export default function DashboardPage() {
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '16px', marginBottom: '32px' }}>
                 {gallery.map(item => (
                   <div key={item.id} style={{ position: 'relative', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', height: '140px', background: '#f1f5f9' }}>
-                    <img src={item.file_url} alt="Gallery" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1555244162-803834f70033?w=300' }} />
+                    <img src={cleanImageUrl(item.file_url) || 'https://images.unsplash.com/photo-1555244162-803834f70033?w=300'} alt="Gallery" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.target.onerror = null; e.target.src = 'https://images.unsplash.com/photo-1555244162-803834f70033?w=300' }} />
                     <button
                       onClick={() => handleDeleteGallery(item.id)}
                       style={{

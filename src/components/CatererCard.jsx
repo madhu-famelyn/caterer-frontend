@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { cleanImageUrl } from '../utils/imageUtils'
 
 function Stars({ count = 5 }) {
   return (
@@ -35,18 +36,14 @@ export default function CatererCard({ caterer }) {
     'https://images.unsplash.com/photo-1466978913421-dad2ebd01d17?w=600&q=80',
     'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=600&q=80',
   ]
-  const cleanImageUrl = (url) => {
-    if (!url) return '';
-    if (url.startsWith('photo_folder:')) {
-      const matches = url.match(/['"](https?:\/\/[^'"]+)['"]/);
-      if (matches && matches[1]) {
-        return matches[1];
-      }
-    }
-    return url;
-  };
-  const finalImageUrl = cleanImageUrl(image_url);
-  const imgSrc = finalImageUrl || fallbackImages[id % fallbackImages.length] || fallbackImages[0]
+
+  const safeId = id || 0
+
+
+
+  const finalImageUrl = cleanImageUrl(image_url)
+  const fallback = fallbackImages[safeId % fallbackImages.length]
+  const imgSrc = finalImageUrl || fallback
 
   return (
     <article className="caterer-card">
@@ -54,7 +51,11 @@ export default function CatererCard({ caterer }) {
         <img
           src={imgSrc}
           alt={displayName}
-          onError={(e) => { e.target.src = fallbackImages[0] }}
+          referrerPolicy="no-referrer"
+          onError={(e) => {
+            e.target.onerror = null // prevent infinite loop
+            e.target.src = fallback
+          }}
         />
         <div className="caterer-card-badges">
           {verified && (

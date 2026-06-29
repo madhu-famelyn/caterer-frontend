@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { cleanImageUrl } from '../utils/imageUtils'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000'
 
@@ -147,16 +148,7 @@ export default function CatererProfilePage() {
     }
   }
 
-  const cleanImageUrl = (url) => {
-    if (!url) return '';
-    if (url.startsWith('photo_folder:')) {
-      const matches = url.match(/['"](https?:\/\/[^'"]+)['"]/);
-      if (matches && matches[1]) {
-        return matches[1];
-      }
-    }
-    return url;
-  };
+
 
   return (
     <div>
@@ -165,7 +157,8 @@ export default function CatererProfilePage() {
         <img
           src={cleanImageUrl(caterer.image_url) || 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&q=80'}
           alt={caterer.business_name}
-          onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&q=80' }}
+          referrerPolicy="no-referrer"
+          onError={(e) => { e.target.onerror = null; e.target.src = 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?w=1200&q=80'; }}
         />
         <div className="profile-hero-overlay" />
       </div>
@@ -246,10 +239,10 @@ export default function CatererProfilePage() {
                   {gallery.map((item) => (
                     <div key={item.id} style={{ borderRadius: 'var(--radius-md)', overflow: 'hidden', height: '140px', border: '1px solid var(--border)' }}>
                       <img
-                        src={item.file_url}
+                        src={cleanImageUrl(item.file_url) || 'https://images.unsplash.com/photo-1555244162-803834f70033?w=300'}
                         alt="Gallery presentation"
                         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1555244162-803834f70033?w=300' }}
+                        onError={(e) => { e.target.onerror = null; e.target.src = 'https://images.unsplash.com/photo-1555244162-803834f70033?w=300' }}
                       />
                     </div>
                   ))}

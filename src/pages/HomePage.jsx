@@ -27,14 +27,32 @@ export default function HomePage() {
 
   useEffect(() => {
     const apiUrl = API_BASE_URL.replace(/\/$/, '')
-    fetch(`${apiUrl}/api/v1/caterers/?limit=3`)
-      .then((r) => r.ok ? r.json() : [])
-      .then((data) => {
-        if (Array.isArray(data)) setCaterers(data)
-      })
-      .catch(() => {})
-      .finally(() => setLoadingCaterers(false))
+    let retries = 3
+
+    const fetchCaterers = () => {
+      fetch(`${apiUrl}/api/v1/caterers/?limit=3`)
+        .then((r) => {
+          if (r.status === 503 && retries > 0) {
+            retries--
+            setTimeout(fetchCaterers, 2000) // retry after 2s (DB waking up)
+            return null
+          }
+          return r.ok ? r.json() : []
+        })
+        .then((data) => {
+          if (data && Array.isArray(data)) {
+            setCaterers(data)
+            setLoadingCaterers(false) // only stop loading when we have real data
+          }
+        })
+        .catch(() => {
+          setLoadingCaterers(false) // stop loading on network error too
+        })
+    }
+
+    fetchCaterers()
   }, [])
+
 
   return (
     <div>

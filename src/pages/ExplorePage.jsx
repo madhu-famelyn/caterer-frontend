@@ -21,13 +21,28 @@ export default function ExplorePage() {
   useEffect(() => {
     const apiUrl = API_BASE_URL.replace(/\/$/, '')
     setLoading(true)
-    fetch(`${apiUrl}/api/v1/caterers/?limit=100`)
-      .then((r) => r.ok ? r.json() : [])
-      .then((data) => {
-        if (Array.isArray(data)) setCaterers(data)
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+    let retries = 4
+
+    const fetchCaterers = () => {
+      fetch(`${apiUrl}/api/v1/caterers/?limit=100`)
+        .then((r) => {
+          if (r.status === 503 && retries > 0) {
+            retries--
+            setTimeout(fetchCaterers, 2500) // retry after 2.5s while Neon wakes up
+            return null
+          }
+          return r.ok ? r.json() : []
+        })
+        .then((data) => {
+          if (data && Array.isArray(data)) {
+            setCaterers(data)
+            setLoading(false)
+          }
+        })
+        .catch(() => setLoading(false))
+    }
+
+    fetchCaterers()
   }, [])
 
   const filtered = caterers.filter((c) => {
